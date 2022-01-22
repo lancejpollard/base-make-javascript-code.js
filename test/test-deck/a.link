@@ -1,0 +1,9 @@
+
+load ./b
+  take form user
+
+  load ./c
+    take task read
+
+test <Log to console>
+  show <hello world>

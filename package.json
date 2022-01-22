@@ -1,0 +1,8 @@
+{
+  "name": "@lancejpollard/generate-javascript-from-link-deck.js",
+  "version": "0.0.1",
+  "dependencies": {
+    "@lancejpollard/load-link-deck.js": "*",
+    "@lancejpollard/normalize-ast.js": "*"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "host": "drumwork",
+  "site": "test-deck",
+  "basePath": "./test-deck",
+  "list": [
+    { "filePath": "./a", "fileType": "test" },
+    { "filePath": ".", "fileType": "deck" },
+    { "filePath": "./b", "fileType": "form" },
+    { "filePath": "./b/c", "fileType": "task" }
+  ],
+  "leadPath": "./a"
+}
