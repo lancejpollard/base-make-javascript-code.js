@@ -62,7 +62,8 @@ task my-task
 ```js
 base.file('test-deck/task-example', file => {
   file.task('my-task', function(inputText) {
-    base.bind('test-deck/y').call('my-other-task', { message: inputText })
+    base.file('test-deck/y')
+      .call('my-other-task', { message: inputText })
   })
 })
 ```

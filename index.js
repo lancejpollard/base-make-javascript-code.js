@@ -3,7 +3,6 @@ const fs = require('fs')
 const HEAD = fs.readFileSync(`${__dirname}/lib/head/index.js`, 'utf-8')
 const PRINT_AST = require('@lancejpollard/normalize-ast.js/print')
 const AST = require('@lancejpollard/normalize-ast.js/create')
-const pathResolver = require('path')
 
 module.exports = make
 
@@ -11,53 +10,6 @@ function make(deck) {
   const compiledDeck = transpile(deck)
   return print(compiledDeck)
 }
-
-// PRINT_AST({
-//   type: 'Program',
-//   body: [
-//     {
-//       "type": "FunctionDeclaration",
-//       "id": null,
-//       "params": [
-//         {
-//           "type": "Identifier",
-//           "name": "array"
-//         }
-//       ],
-//       "body": {
-//         "type": "BlockStatement",
-//         "body": [
-//           {
-//             "type": "ReturnStatement",
-//             "argument": {
-//               "type": "CallExpression",
-//               "callee": {
-//                 "type": "MemberExpression",
-//                 "object": {
-//                   "type": "Identifier",
-//                   "name": "Promise"
-//                 },
-//                 "property": {
-//                   "type": "Identifier",
-//                   "name": "all"
-//                 },
-//                 "computed": false
-//               },
-//               "arguments": [
-//                 {
-//                   "type": "Identifier",
-//                   "name": "array"
-//                 }
-//               ]
-//             }
-//           }
-//         ]
-//       },
-//       "async": false,
-//       "generator": false
-//     }
-//   ]
-// })
 
 function print(compiledDeck) {
   const program = {
@@ -109,7 +61,7 @@ function makeTurn(file, zone) {
   return AST.createReturnStatement(argument)
 }
 
-function makeCall(file, call) {
+function makeCall(file, call, ids) {
   const wait = !!call.wait
   const args = []
 
@@ -203,7 +155,7 @@ function makeDockTaskFile(file) {
       file.output.call.push(makeCall(file, call))
     }
   })
-  console.log('make dock')
+
   file.bound = makeBaseBindExpression(
     file.hostFile.road,
     AST.createFunctionDeclaration(null, [
@@ -233,13 +185,13 @@ function makeTurn(file, zone) {
   return AST.createReturnStatement(argument)
 }
 
-function makeSift(file, sift) {
+function makeSift(file, sift, ids) {
   switch (sift.form) {
     case `sift-text`: return AST.createLiteral(sift.text)
     case `text`: return AST.createLiteral(sift.text)
     case `size`: return AST.createLiteral(sift.size)
     case `link`: return makeLink(file, sift.link)
-    case `call`: return makeDockCall(file, sift)
+    case `call`: return makeDockCall(file, sift, ids)
   }
 }
 
@@ -250,8 +202,13 @@ function makeSift(file, sift) {
 function makeDockTask(file, task) {
   const params = []
   const wait = !!task.wait
-  task.base.forEach(base => {
-    params.push(AST.createIdentifier(base.name))
+  const ids = {
+    name: {},
+    mark: 1
+  }
+  task.link.forEach(link => {
+    const id = ids.name[link.name] = `x${ids.mark++}`
+    params.push(AST.createIdentifier(id))
   })
 
   const body = []
@@ -268,7 +225,7 @@ function makeDockTask(file, task) {
         body.push(makeTurn(file, zone))
         break
       case `call`:
-        body.push(makeDockCall(file, zone))
+        body.push(makeDockCall(file, zone, ids))
         break
     }
   })
@@ -309,7 +266,7 @@ function makeThrowError(call) {
   const factor = call.bind.filter(bind => bind.name === 'factor')[0]
   return AST.createThrowStatement(
     AST.createNewExpression(
-      AST.createLiteral('Error'),
+      AST.createIdentifier('Error'),
       [
         factor.sift.link ? makeLink(null, factor.sift.link) : AST.createLiteral(factor.sift.text)
       ]
@@ -317,17 +274,17 @@ function makeThrowError(call) {
   )
 }
 
-function makeDockCall(file, call) {
+function makeDockCall(file, call, ids) {
   if (!transforms[call.name]) {
     throw new Error(`Missing implementation of ${call.name}`)
   }
-  const base = transforms[call.name](call)
+  const base = transforms[call.name](call, ids)
   return base
 }
 
 function makeDockCallCreateLiteral(call) {
   const literal = call.bind.filter(bind => bind.name === 'literal')[0]
-  return AST.createLiteral(literal.sift.text)
+  return AST.createReturnStatement(createLiteral(literal.sift.text))
 }
 
 function makeDockCallDelete(call) {
@@ -343,7 +300,9 @@ function makeDockCallDelete(call) {
 function makeDockCallGetAspect(call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
-  return AST.createMemberExpression(makeLink(null, object.sift.link), AST.createIdentifier(aspect.sift.text), true)
+  return AST.createReturnStatement(
+    AST.createMemberExpression(makeLink(null, object.sift.link), AST.createIdentifier(aspect.sift.text), false)
+  )
 }
 
 function makeDockCallSetAspect(call) {
@@ -351,7 +310,7 @@ function makeDockCallSetAspect(call) {
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
   const factor = call.bind.filter(bind => bind.name === 'factor')[0]
   return AST.createAssignmentExpression(
-    AST.createMemberExpression(makeLink(null, object.sift.link), AST.createIdentifier(aspect.sift.text), true),
+    AST.createMemberExpression(makeLink(null, object.sift.link), AST.createIdentifier(aspect.sift.text), false),
     makeLink(null, factor.sift.link)
   )
 }
@@ -359,7 +318,9 @@ function makeDockCallSetAspect(call) {
 function makeDockCallGetDynamicAspect(call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
-  return AST.createMemberExpression(makeLink(null, object.sift.link), makeLink(null, aspect.sift.link), true)
+  return AST.createReturnStatement(
+    AST.createMemberExpression(makeLink(null, object.sift.link), makeLink(null, aspect.sift.link), true)
+  )
 }
 
 function makeDockCallSetDynamicAspect(call) {
@@ -376,19 +337,23 @@ function makeDockCallKeyword2(call) {
   const left = call.bind.filter(bind => bind.name === 'left')[0]
   const keyword = call.bind.filter(bind => bind.name === 'keyword')[0]
   const right = call.bind.filter(bind => bind.name === 'right')[0]
-  return AST.createBinaryExpression(
-    makeLink(null, left.sift.link),
-    keyword.sift.text,
-    makeLink(null, right.sift.link)
+  return AST.createReturnStatement(
+    AST.createBinaryExpression(
+      makeLink(null, left.sift.link),
+      keyword.sift.text,
+      makeLink(null, right.sift.link)
+    )
   )
 }
 
 function makeDockCallKeyword(call) {
   const keyword = call.bind.filter(bind => bind.name === 'keyword')[0]
   const value = call.bind.filter(bind => bind.name === 'value')[0]
-  return AST.createUnaryExpression(
-    makeLink(null, value.sift.link),
-    keyword.sift.text
+  return AST.createReturnStatement(
+    AST.createUnaryExpression(
+      makeLink(null, value.sift.link),
+      keyword.sift.text
+    )
   )
 }
 
@@ -411,7 +376,7 @@ function makeDockCallTestElse(call) {
   const block = call.bind.filter(bind => bind.name === 'block')[0]
   const other = call.bind.filter(bind => bind.name === 'else')[0]
   return AST.createIfStatement(
-    makeLink(null, check.sift.link),
+    AST.createCallExpression(AST.createIdentifier(check.sift.link.name)),
     AST.createBlockStatement([makeLink(null, block.sift.link)]),
     AST.createBlockStatement([makeLink(null, other.sift.link)])
   )
@@ -429,10 +394,12 @@ function makeDockCallCallTry(call) {
 function makeDockCallUnaryOperation(call) {
   const value = call.bind.filter(bind => bind.name === 'value')[0]
   const operation = call.bind.filter(bind => bind.name === 'operation')[0]
-  return AST.createUpdateExpression(
-    makeLink(null, value.sift.link),
-    operation.sift.text,
-    true
+  return AST.createReturnStatement(
+    AST.createUpdateExpression(
+      makeLink(null, value.sift.link),
+      operation.sift.text,
+      true
+    )
   )
 }
 
@@ -440,11 +407,13 @@ function makeDockCallBinaryExpression(call) {
   const left = call.bind.filter(bind => bind.name === 'left')[0]
   const right = call.bind.filter(bind => bind.name === 'right')[0]
   const operation = call.bind.filter(bind => bind.name === 'operation')[0]
-  return AST.createReturnStatement(AST.createBinaryExpression(
-    makeLink(null, left.sift.link),
-    operation.sift.text,
-    right.sift.form === 'sift-text' ? AST.createLiteral(right.sift.text) : makeLink(null, right.sift.link)
-  ))
+  return AST.createReturnStatement(
+    AST.createBinaryExpression(
+      makeLink(null, left.sift.link),
+      operation.sift.text,
+      right.sift.form === 'sift-text' ? AST.createLiteral(right.sift.text) : makeLink(null, right.sift.link)
+    )
+  )
 }
 
 function makeDockCallMake(call) {
@@ -454,35 +423,43 @@ function makeDockCallMake(call) {
   factor.forEach(factor => {
     args.push(makeLink(null, factor.sift.link))
   })
-  return AST.createNewExpression(
-    AST.createIdentifier(ctor.sift.text),
-    args
+  return AST.createReturnStatement(
+    AST.createNewExpression(
+      AST.createIdentifier(ctor.sift.text),
+      args
+    )
   )
 }
 
-function makeDockCallCallBase(call, fileScope) {
+function makeDockCallCallBase(call, ids) {
   const object = call.bind[0]
   const method = call.bind[1]
   const factor = call.bind.slice(2)
   const args = []
   factor.forEach(factor => {
-    args.push(makeLink(null, factor.sift.link))
+    const link = ids.name[factor.sift.link] ?? factor.sift.link
+    console.log(link)
+    args.push(makeLink(null, link))
   })
   if (object.sift.form === 'link') {
-    return AST.createCallExpression(
+    return AST.createReturnStatement(
+      AST.createCallExpression(
+        AST.createMemberExpression(
+          makeLink(null, object.sift.link, ids),
+          AST.createIdentifier(method.sift.text)
+        ),
+        args
+      )
+    )
+  }
+  return AST.createReturnStatement(
+    AST.createCallExpression(
       AST.createMemberExpression(
-        makeLink(null, object.sift.link, fileScope),
+        AST.createIdentifier(object.sift.text),
         AST.createIdentifier(method.sift.text)
       ),
       args
     )
-  }
-  return AST.createCallExpression(
-    AST.createMemberExpression(
-      AST.createIdentifier(object.sift.text),
-      AST.createIdentifier(method.sift.text)
-    ),
-    args
   )
 }
 
@@ -521,8 +498,6 @@ function makeLink(file, link) {
 }
 
 function transpile(deck) {
-  let file = deck.load[deck.lead]
-
   const list = Object.values(deck.load)
   const compiledDeck = {
     originalDeck: deck,
@@ -602,8 +577,13 @@ function makeTaskFile(file) {
 function makeTask(file, task) {
   const params = []
   const wait = !!task.wait
-  task.base.forEach(base => {
-    params.push(AST.createIdentifier(base.name))
+  const ids = {
+    name: {},
+    mark: 1
+  }
+  task.link.forEach(base => {
+    const id = ids.name[base.name] = `x${ids.mark++}`
+    params.push(AST.createIdentifier(id))
   })
 
   const body = []
@@ -620,7 +600,7 @@ function makeTask(file, task) {
         body.push(makeTurn(file, zone))
         break
       case `call`:
-        body.push(makeCall(file, zone))
+        body.push(makeCall(file, zone, ids))
         break
     }
   })
@@ -651,4 +631,12 @@ function makeTest(bind, test) {
     form: 'call',
     name: key
   })
+}
+
+function createLiteral(value) {
+  return {
+    type: 'Literal',
+    value,
+    raw: value
+  }
 }
