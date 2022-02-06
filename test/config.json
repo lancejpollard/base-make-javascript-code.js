@@ -1,12 +1,29 @@
-{
-  "host": "drumwork",
-  "site": "test-deck",
-  "basePath": "./test-deck",
-  "list": [
-    { "filePath": "./a", "fileType": "test" },
-    { "filePath": ".", "fileType": "deck" },
-    { "filePath": "./b", "fileType": "form" },
-    { "filePath": "./b/c", "fileType": "task" }
-  ],
-  "leadPath": "./a"
-}
+[
+  {
+    "host": "drumwork",
+    "site": "base",
+    "basePath": "../../../../../drumwork/deck/base",
+    "leadPath": "./work/dock/browser/test",
+    "list": [
+      { "filePath": "work/dock/browser", "fileType": "task" },
+      { "filePath": "work/dock/browser/test", "fileType": "test" },
+      { "filePath": "work/dock/browser/task/mesh", "fileType": "task" }
+    ]
+  },
+  {
+    "host": "drumwork",
+    "site": "dock",
+    "basePath": "../../../../../drumwork/deck/dock",
+    "list": [
+      { "filePath": "code/javascript/function", "fileType": "dock-task" },
+      { "filePath": "code/javascript/error", "fileType": "dock-task" },
+      { "filePath": "code/javascript/module", "fileType": "dock-task" },
+      { "filePath": "code/javascript/string", "fileType": "dock-task" },
+      { "filePath": "code/javascript/base", "fileType": "dock-task" },
+      { "filePath": "code/javascript/console", "fileType": "dock-task" },
+      { "filePath": "code/javascript/number", "fileType": "dock-task" },
+      { "filePath": "code/javascript/object", "fileType": "dock-task" },
+      { "filePath": "code/javascript/promise", "fileType": "dock-task" }
+    ]
+  }
+]

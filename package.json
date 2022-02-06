@@ -4,5 +4,8 @@
   "dependencies": {
     "@lancejpollard/load-link-deck.js": "*",
     "@lancejpollard/normalize-ast.js": "*"
+  },
+  "scripts": {
+    "test": "node --enable-source-maps test"
   }
 }

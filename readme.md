@@ -28,18 +28,13 @@ First is the base framework in place for hosting all of the data and functionali
 // internally we do this.
 const base = new Base()
 
-base.load(path, file => {
+base.file(path, file => {
   // 1. define local variables to be used in functions.
   let localVariable
 
   // 2. construct data objects.
 
   // 3. define any JavaScript functions.
-
-  // 4. set local variables.
-  file.bind(() => {
-    localVariable = xPath
-  })
 })
 
 // 5. bind each file so the variables get bound.
@@ -65,9 +60,9 @@ task my-task
 ```
 
 ```js
-base.load('test-deck/task-example', file => {
+base.file('test-deck/task-example', file => {
   file.task('my-task', function(inputText) {
-    base.load('test-deck/y').call('my-other-task', { message: inputText })
+    base.bind('test-deck/y').call('my-other-task', { message: inputText })
   })
 })
 ```
@@ -87,7 +82,7 @@ form my-form
 ```
 
 ```js
-base.load('test-deck/form-example', file => {
+base.file('test-deck/form-example', file => {
   file.save('form/my-form', {
     head: [{ name: 'my-other-form' }],
     base: [{ name: 'my-attribute' }]
