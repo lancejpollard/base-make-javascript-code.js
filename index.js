@@ -6,8 +6,8 @@ const AST = require('@lancejpollard/normalize-ast.js/create')
 
 module.exports = make
 
-function make(deck) {
-  const compiledDeck = transpile(deck)
+function make(base) {
+  const compiledDeck = transpile(base)
   return print(compiledDeck)
 }
 
@@ -30,6 +30,77 @@ function print(compiledDeck) {
   return HEAD + '\n' + PRINT_AST(program)
 }
 
+function transpile(deck) {
+  const list = Object.values(deck.load)
+  const compiledDeck = {
+    originalDeck: deck,
+    files: {}
+  }
+  while (list.length) {
+    const base = list.shift()
+    if (compiledDeck.files[base.road]) {
+      continue
+    }
+    const fork = compiledDeck.files[base.road] = createBaseFork(base)
+    makeFile(fork)
+  }
+  return compiledDeck
+}
+
+function makeFile(fork) {
+  switch (fork.file.mint) {
+    case `task`:
+      makeTaskFile(fork)
+      break
+    case `dock-task`:
+      makeDockTaskFile(fork)
+      break
+    case `form`:
+      makeFormFile(fork)
+      break
+    case `mine`:
+      makeMineFile(fork)
+      break
+    case `mill`:
+      makeMillFile(fork)
+      break
+    case `call`:
+      makeCallFile(fork)
+      break
+    case `feed`:
+      makeFeedFile(fork)
+      break
+    case `test`:
+      makeTestFile(fork)
+      break
+    // case `view`:
+    //   makeViewFile(fork)
+    //   break
+    // default:
+    //   throw fork.mint
+    //   break
+  }
+  return fork
+}
+
+function makeTaskFile(fork) {
+  fork.output = {}
+
+  fork.output.task = []
+
+  fork.file.task.forEach(task => {
+    const taskFork = createNewFork(fork)
+    setForkBond({ fork: taskFork, term: 'task', bond: task })
+    fork.output.task.push(makeTask(taskFork))
+  })
+
+  // fork.output.call = []
+
+  // fork.hostFile.call.forEach(call => {
+  //   fork.output.call.push(call)
+  // })
+}
+
 function makeBaseBindExpression(road, bind) {
   return AST.createCallExpression(
     AST.createMemberExpression(
@@ -40,15 +111,41 @@ function makeBaseBindExpression(road, bind) {
   )
 }
 
-function makeSave(file, zone) {
-  const left = zone.nest.form === 'nest' ? makeNest(file, zone.nest) : makeLink(file, zone.nest)
-  const right = makeSift(file, zone.sift)
+function makeBond(fork, bond) {
+  switch (bond.form) {
+    case `sift-text`: return AST.createLiteral(bond.text)
+    case `text`: return AST.createLiteral(bond.text)
+    case `size`: return AST.createLiteral(bond.size)
+    case `link`: return makeLink(fork, bond.link)
+    case `call`: return makeCall(fork, bond)
+    case `task`:
+      const taskFork = createNewFork(fork)
+      taskFork.task = bond
+      return makeTask(taskFork)
+    default:
+      throw new Error(JSON.stringify(bond))
+  }
+}
+
+function makeLink(fork, link) {
+  if (link.form === 'host') {
+    const term = getForkTerm({ fork, name: link.name })
+    return AST.createIdentifier(term)
+  } else {
+    return makeNest(fork, link)
+  }
+}
+
+function makeSave(fork, zone) {
+  const left = zone.nest.form === 'nest' ? makeNest(fork, zone.nest) : makeLink(fork, zone.nest)
+  const right = makeBond(fork, zone.sift)
   return AST.createAssignmentExpression(left, right)
 }
 
-function makeHost(file, zone) {
-  const left = AST.createIdentifier(zone.name)
-  const right = zone.sift && makeSift(file, zone.sift)
+function makeHost(fork, zone) {
+  const term = getForkTerm({ fork, name: zone.name })
+  const left = AST.createIdentifier(term)
+  const right = zone.sift && makeBond(fork, zone.sift)
   return AST.createVariable(
     'let',
     left,
@@ -56,41 +153,39 @@ function makeHost(file, zone) {
   )
 }
 
-function makeTurn(file, zone) {
-  const argument = makeSift(file, zone.sift)
+function makeTurn(fork, zone) {
+  const argument = makeBond(fork, zone.sift)
   return AST.createReturnStatement(argument)
 }
 
-function makeCall(file, call, ids) {
+function makeCall(fork, call) {
   const wait = !!call.wait
   const args = []
 
   call.bind.forEach(b => {
-    const arg = b.sift.form === 'task'
-      ? makeTask(file, b.sift)
-      : makeSift(file, b.sift)
-    args.push(arg)
+    args.push(makeBond(fork, b.sift))
   })
 
   call.hook.forEach(h => {
     const params = []
-    h.base.forEach(b => {
-      params.push(AST.createIdentifier(b.name))
+    const hookFork = createNewFork(fork)
+    h.link.forEach(link => {
+      params.push(makeTerm(hookFork, link.name))
     })
     const body = []
     h.zone.forEach(zone => {
       switch (zone.form) {
         case `host`:
-          body.push(makeHost(file, zone))
+          body.push(makeHost(hookFork, zone))
           break
         case `save`:
-          body.push(makeSave(file, zone))
+          body.push(makeSave(hookFork, zone))
           break
         case `turn`:
-          body.push(makeTurn(file, zone))
+          body.push(makeTurn(hookFork, zone))
           break
         case `call`:
-          body.push(makeCall(file, zone))
+          body.push(makeCall(hookFork, zone))
           break
       }
     })
@@ -106,24 +201,6 @@ function makeCall(file, call, ids) {
   )
 }
 
-function makeSift(file, sift) {
-  switch (sift.form) {
-    case `sift-text`: return AST.createLiteral(sift.text)
-    case `text`: return AST.createLiteral(sift.text)
-    case `size`: return AST.createLiteral(sift.size)
-    case `link`: return makeLink(file, sift.link)
-    case `call`: return makeCall(file, sift)
-  }
-}
-
-function makeLink(file, link) {
-  if (link.form === 'host') {
-    return AST.createIdentifier(link.name)
-  } else {
-    return makeNest(link)
-  }
-}
-
 function makeNest(node) {
   if (node.form == 'site') {
     return {
@@ -136,33 +213,76 @@ function makeNest(node) {
       type: 'MemberExpression',
       object: lhs,
       property: makeNest(rhs),
-      computed: rhs.form == 'nest',
+      computed: rhs.form === 'nest',
     }), makeNest(base));
   }
 }
 
-function makeDockTaskFile(file) {
-  file.output = {}
-  file.output.task = []
-  file.hostFile.task.forEach(task => {
-    file.output.task.push(makeDockTask(file, task))
+/**
+ * This is a higher-level function.
+ */
+
+function makeTask(fork) {
+  const task = getForkBond(fork, 'task')
+  const params = []
+  const wait = !!task.wait
+  task.link.forEach(base => {
+    params.push(makeTerm(fork, base.name))
   })
-  file.output.call = []
-  file.hostFile.call.forEach(call => {
-    if (call.form === 'save') {
-      file.output.call.push(makeSave(file, call))
-    } else {
-      file.output.call.push(makeCall(file, call))
+
+  const body = []
+
+  task.zone.forEach(zone => {
+    switch (zone.form) {
+      case `host`:
+        body.push(makeHost(fork, zone))
+        break
+      case `save`:
+        body.push(makeSave(fork, zone))
+        break
+      case `turn`:
+        body.push(makeTurn(fork, zone))
+        break
+      case `call`:
+        body.push(makeCall(fork, zone))
+        break
     }
   })
 
-  file.bound = makeBaseBindExpression(
-    file.hostFile.road,
+  const fxnAST = AST.createFunctionDeclaration(
+    AST.createIdentifier(task.name),
+    params,
+    AST.createBlockStatement(body),
+    { async: wait }
+  )
+  return fxnAST
+}
+
+function makeDockTaskFile(fork) {
+  fork.output = {}
+  fork.output.task = []
+  fork.file.task.forEach(task => {
+    const taskFork = createNewFork(fork)
+    setForkBond({ fork: taskFork, term: 'task', bond: task })
+    fork.output.task.push(makeDockTask(taskFork))
+  })
+
+  fork.output.call = []
+  fork.file.call.forEach(call => {
+    if (call.form === 'save') {
+      fork.output.call.push(makeSave(fork, call))
+    } else {
+      fork.output.call.push(makeCall(fork, call))
+    }
+  })
+
+  fork.bound = makeBaseBindExpression(
+    fork.file.road,
     AST.createFunctionDeclaration(null, [
       AST.createIdentifier('file')
     ], AST.createBlockStatement([
-      ...file.output.call,
-      ...file.output.task.map((task, i) => makeFileTask(file.hostFile.task[i].name, task)),
+      ...fork.output.call,
+      ...fork.output.task.map((task, i) => makeFileTask(fork.file.task[i].name, task)),
     ]))
   )
 }
@@ -181,33 +301,21 @@ function makeFileTask(name, task) {
 }
 
 function makeTurn(file, zone) {
-  const argument = makeSift(file, zone.sift)
+  const argument = makeBond(file, zone.sift)
   return AST.createReturnStatement(argument)
-}
-
-function makeSift(file, sift, ids) {
-  switch (sift.form) {
-    case `sift-text`: return AST.createLiteral(sift.text)
-    case `text`: return AST.createLiteral(sift.text)
-    case `size`: return AST.createLiteral(sift.size)
-    case `link`: return makeLink(file, sift.link)
-    case `call`: return makeDockCall(file, sift, ids)
-  }
 }
 
 /**
  * This is a native JavaScript function.
  */
 
-function makeDockTask(file, task) {
+function makeDockTask(fork) {
   const params = []
+  const task = getForkBond(fork, 'task')
   const wait = !!task.wait
-  const ids = {
-    name: {},
-    mark: 1
-  }
+
   task.link.forEach(link => {
-    const id = ids.name[link.name] = `x${ids.mark++}`
+    const id = getForkTerm({ fork, name: link.name })
     params.push(AST.createIdentifier(id))
   })
 
@@ -216,16 +324,16 @@ function makeDockTask(file, task) {
   task.zone.forEach(zone => {
     switch (zone.form) {
       case `host`:
-        body.push(makeHost(file, zone))
+        body.push(makeHost(fork, zone))
         break
       case `save`:
-        body.push(makeSave(file, zone))
+        body.push(makeSave(fork, zone))
         break
       case `turn`:
-        body.push(makeTurn(file, zone))
+        body.push(makeTurn(fork, zone))
         break
       case `call`:
-        body.push(makeDockCall(file, zone, ids))
+        body.push(makeDockCall(fork, zone))
         break
     }
   })
@@ -242,9 +350,8 @@ function makeDockTask(file, task) {
 const transforms = {
   make: makeDockCallMake,
   test: makeDockCallTest,
-  look: makeDockCallLook,
   'call-base': makeDockCallCallBase,
-  'call-function':  makeDockCallCallFunction,
+  'call-function': makeDockCallCallFunction,
   'call-head': makeDockCallUnaryOperation,
   'call-twin': makeDockCallBinaryExpression,
   'call-try': makeDockCallCallTry,
@@ -262,166 +369,211 @@ const transforms = {
   'throw-error': makeThrowError,
 }
 
-function makeThrowError(call) {
+function makeThrowError(fork, call) {
   const factor = call.bind.filter(bind => bind.name === 'factor')[0]
   return AST.createThrowStatement(
     AST.createNewExpression(
       AST.createIdentifier('Error'),
       [
-        factor.sift.link ? makeLink(null, factor.sift.link) : AST.createLiteral(factor.sift.text)
+        factor.sift.link ? makeLink(fork, factor.sift.link) : AST.createLiteral(factor.sift.text)
       ]
     )
   )
 }
 
-function makeDockCall(file, call, ids) {
+function makeDockCall(fork, call) {
   if (!transforms[call.name]) {
     throw new Error(`Missing implementation of ${call.name}`)
   }
-  const base = transforms[call.name](call, ids)
+  const base = transforms[call.name](fork, call)
   return base
 }
 
-function makeDockCallCreateLiteral(call) {
+function makeDockCallCreateLiteral(fork, call) {
   const literal = call.bind.filter(bind => bind.name === 'literal')[0]
   return AST.createReturnStatement(createLiteral(literal.sift.text))
 }
 
-function makeDockCallDelete(call) {
+function makeDockCallDelete(fork, call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
   return AST.createUnaryExpression(
-    AST.createMemberExpression(makeLink(null, object.sift.link), makeLink(null, aspect.sift.link), true),
+    AST.createMemberExpression(
+      makeLink(fork, object.sift.link),
+      makeLink(fork, aspect.sift.link), true
+    ),
     'delete',
     true
   )
 }
 
-function makeDockCallGetAspect(call) {
+function makeDockCallGetAspect(fork, call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
   return AST.createReturnStatement(
-    AST.createMemberExpression(makeLink(null, object.sift.link), AST.createIdentifier(aspect.sift.text), false)
+    AST.createMemberExpression(
+      makeLink(fork, object.sift.link),
+      AST.createIdentifier(aspect.sift.text),
+      false
+    )
   )
 }
 
-function makeDockCallSetAspect(call) {
+function makeDockCallSetAspect(fork, call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
   const factor = call.bind.filter(bind => bind.name === 'factor')[0]
   return AST.createAssignmentExpression(
-    AST.createMemberExpression(makeLink(null, object.sift.link), AST.createIdentifier(aspect.sift.text), false),
-    makeLink(null, factor.sift.link)
+    AST.createMemberExpression(
+      makeLink(fork, object.sift.link),
+      AST.createIdentifier(aspect.sift.text),
+      false
+    ),
+    makeLink(fork, factor.sift.link)
   )
 }
 
-function makeDockCallGetDynamicAspect(call) {
+function makeDockCallGetDynamicAspect(fork, call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
   return AST.createReturnStatement(
-    AST.createMemberExpression(makeLink(null, object.sift.link), makeLink(null, aspect.sift.link), true)
+    AST.createMemberExpression(
+      makeLink(fork, object.sift.link),
+      makeLink(fork, aspect.sift.link),
+      true
+    )
   )
 }
 
-function makeDockCallSetDynamicAspect(call) {
+function makeDockCallSetDynamicAspect(fork, call) {
   const object = call.bind.filter(bind => bind.name === 'object')[0]
   const aspect = call.bind.filter(bind => bind.name === 'aspect')[0]
   const factor = call.bind.filter(bind => bind.name === 'factor')[0]
   return AST.createAssignmentExpression(
-    AST.createMemberExpression(makeLink(null, object.sift.link), makeLink(null, aspect.sift.link), true),
-    makeLink(null, factor.sift.link)
+    AST.createMemberExpression(
+      makeLink(fork, object.sift.link),
+      makeLink(fork, aspect.sift.link),
+      true
+    ),
+    makeLink(fork, factor.sift.link)
   )
 }
 
-function makeDockCallKeyword2(call) {
+function makeDockCallKeyword2(fork, call) {
   const left = call.bind.filter(bind => bind.name === 'left')[0]
   const keyword = call.bind.filter(bind => bind.name === 'keyword')[0]
   const right = call.bind.filter(bind => bind.name === 'right')[0]
   return AST.createReturnStatement(
     AST.createBinaryExpression(
-      makeLink(null, left.sift.link),
+      makeLink(fork, left.sift.link),
       keyword.sift.text,
-      makeLink(null, right.sift.link)
+      makeLink(fork, right.sift.link)
     )
   )
 }
 
-function makeDockCallKeyword(call) {
+function makeDockCallKeyword(fork, call) {
   const keyword = call.bind.filter(bind => bind.name === 'keyword')[0]
   const value = call.bind.filter(bind => bind.name === 'value')[0]
   return AST.createReturnStatement(
     AST.createUnaryExpression(
-      makeLink(null, value.sift.link),
-      keyword.sift.text
+      makeLink(fork, value.sift.link),
+      keyword.sift.text,
+      true
     )
   )
 }
 
-function makeDockCallDebug(call) {
-  const keyword = call.bind.filter(bind => bind.name === 'keyword')[0]
+function makeDockCallDebug() {
   return AST.createDebuggerStatement()
 }
 
-function makeDockCallLoop(call) {
+function makeTerm(fork, name) {
+  const term = getForkTerm({ fork, name })
+  return AST.createIdentifier(term)
+}
+
+function makeDockCallLoop(fork, call) {
   const check = call.bind.filter(bind => bind.name === 'check')[0]
   const block = call.bind.filter(bind => bind.name === 'block')[0]
+  console.log(check.sift.link)
   return AST.createWhileStatement(
-    makeLink(null, check.sift.link),
-    [makeLink(null, block.sift.link)]
+    AST.createCallExpression(
+      makeTerm(fork, check.sift.link.name)
+    ),
+    [AST.createCallExpression(
+      makeTerm(fork, block.sift.link.name)
+    )]
   )
 }
 
-function makeDockCallTestElse(call) {
+function makeDockCallTestElse(fork, call) {
   const check = call.bind.filter(bind => bind.name === 'check')[0]
   const block = call.bind.filter(bind => bind.name === 'block')[0]
   const other = call.bind.filter(bind => bind.name === 'else')[0]
   return AST.createIfStatement(
-    AST.createCallExpression(AST.createIdentifier(check.sift.link.name)),
-    AST.createBlockStatement([makeLink(null, block.sift.link)]),
-    AST.createBlockStatement([makeLink(null, other.sift.link)])
+    AST.createCallExpression(
+      makeTerm(fork, check.sift.link.name)
+    ),
+    AST.createBlockStatement([
+      AST.createCallExpression(
+        makeTerm(fork, block.sift.link.name)
+      )
+    ]),
+    AST.createBlockStatement([
+      AST.createCallExpression(
+        makeTerm(fork, other.sift.link.name)
+      )
+    ])
   )
 }
 
-function makeDockCallCallTry(call) {
+function makeDockCallCallTry(fork, call) {
   const block = call.bind.filter(bind => bind.name === 'block')[0]
   const error = call.bind.filter(bind => bind.name === 'error')[0]
   return AST.createTryStatement(
-    makeLink(null, block.sift.link),
-    makeLink(null, error.sift.link)
+    AST.createCallExpression(
+      makeTerm(fork, block.sift.link.name)
+    ),
+    AST.createCallExpression(
+      makeTerm(fork, error.sift.link.name)
+    )
   )
 }
 
-function makeDockCallUnaryOperation(call) {
+function makeDockCallUnaryOperation(fork, call) {
   const value = call.bind.filter(bind => bind.name === 'value')[0]
   const operation = call.bind.filter(bind => bind.name === 'operation')[0]
   return AST.createReturnStatement(
     AST.createUpdateExpression(
-      makeLink(null, value.sift.link),
+      makeLink(fork, value.sift.link),
       operation.sift.text,
       true
     )
   )
 }
 
-function makeDockCallBinaryExpression(call) {
+function makeDockCallBinaryExpression(fork, call) {
   const left = call.bind.filter(bind => bind.name === 'left')[0]
   const right = call.bind.filter(bind => bind.name === 'right')[0]
   const operation = call.bind.filter(bind => bind.name === 'operation')[0]
   return AST.createReturnStatement(
     AST.createBinaryExpression(
-      makeLink(null, left.sift.link),
+      makeLink(fork, left.sift.link),
       operation.sift.text,
-      right.sift.form === 'sift-text' ? AST.createLiteral(right.sift.text) : makeLink(null, right.sift.link)
+      right.sift.form === 'sift-text'
+        ? AST.createLiteral(right.sift.text)
+        : makeLink(fork, right.sift.link)
     )
   )
 }
 
-function makeDockCallMake(call) {
+function makeDockCallMake(fork, call) {
   const ctor = call.bind[0]
   const factor = call.bind.slice(1)
   const args = []
   factor.forEach(factor => {
-    args.push(makeLink(null, factor.sift.link))
+    args.push(makeLink(fork, factor.sift.link))
   })
   return AST.createReturnStatement(
     AST.createNewExpression(
@@ -431,27 +583,27 @@ function makeDockCallMake(call) {
   )
 }
 
-function makeDockCallCallBase(call, ids) {
+function makeDockCallCallBase(fork, call) {
   const object = call.bind[0]
   const method = call.bind[1]
   const factor = call.bind.slice(2)
   const args = []
   factor.forEach(factor => {
-    const link = ids.name[factor.sift.link] ?? factor.sift.link
-    console.log(link)
-    args.push(makeLink(null, link))
+    args.push(makeLink(fork, factor.sift.link))
   })
+
   if (object.sift.form === 'link') {
     return AST.createReturnStatement(
       AST.createCallExpression(
         AST.createMemberExpression(
-          makeLink(null, object.sift.link, ids),
+          makeLink(fork, object.sift.link),
           AST.createIdentifier(method.sift.text)
         ),
         args
       )
     )
   }
+
   return AST.createReturnStatement(
     AST.createCallExpression(
       AST.createMemberExpression(
@@ -463,155 +615,34 @@ function makeDockCallCallBase(call, ids) {
   )
 }
 
-function makeDockCallCallFunction(call, fileScope) {
+function makeDockCallCallFunction(fork, call) {
   const func = call.bind[0]
   const factor = call.bind.slice(1)
   const args = []
   factor.forEach(factor => {
-    args.push(makeLink(null, factor.sift.link))
+    args.push(makeLink(fork, factor.sift.link))
   })
-  return AST.createCallExpression(
-    AST.createIdentifier(func.sift.text),
-    args
+  return AST.createReturnStatement(
+    AST.createCallExpression(
+      AST.createIdentifier(func.sift.text),
+      args
+    )
   )
 }
 
-function makeDockCallTest(call) {
+function makeDockCallTest(fork, call) {
   const test = call.bind[0]
   const make = call.bind[1]
   return AST.createIfStatement(
-    makeLink(null, test.sift.link),
-    AST.createBlockStatement([makeLink(null, make.sift.link)])
+    AST.createCallExpression(
+      makeTerm(fork, test.sift.link.name)
+    ),
+    AST.createBlockStatement([
+      AST.createCallExpression(
+        makeTerm(fork, make.sift.link.name)
+      )
+    ])
   )
-}
-
-function makeDockCallLook() {
-  return `debugger`
-}
-
-function makeLink(file, link) {
-  if (link.form === 'host') {
-    return AST.createIdentifier(link.name)
-  } else {
-    return makeNest(link)
-  }
-}
-
-function transpile(deck) {
-  const list = Object.values(deck.load)
-  const compiledDeck = {
-    originalDeck: deck,
-    files: {}
-  }
-  while (list.length) {
-    const base = list.shift()
-    if (compiledDeck.files[base.road]) {
-      continue
-    }
-    const compiledFile = compiledDeck.files[base.road] = {
-      hostFile: base,
-      name: {},
-      mark: 1,
-    }
-    makeFile(compiledFile)
-  }
-  return compiledDeck
-}
-
-function makeFile(file) {
-  switch (file.hostFile.mint) {
-    case `task`:
-      makeTaskFile(file)
-      break
-    case `dock-task`:
-      makeDockTaskFile(file)
-      break
-    case `form`:
-      makeFormFile(file)
-      break
-    case `mine`:
-      makeMineFile(file)
-      break
-    case `mill`:
-      makeMillFile(file)
-      break
-    case `call`:
-      makeCallFile(file)
-      break
-    case `feed`:
-      makeFeedFile(file)
-      break
-    case `test`:
-      makeTestFile(file)
-      break
-    // case `view`:
-    //   makeViewFile(file)
-    //   break
-    // default:
-    //   throw file.mint
-    //   break
-  }
-  return file
-}
-
-function makeTaskFile(file) {
-  file.output = {}
-
-  file.output.task = []
-
-  file.hostFile.task.forEach(task => {
-    file.output.task.push(makeTask(file, task))
-  })
-
-  // file.output.call = []
-
-  // file.hostFile.call.forEach(call => {
-  //   file.output.call.push(call)
-  // })
-}
-
-/**
- * This is a higher-level function.
- */
-
-function makeTask(file, task) {
-  const params = []
-  const wait = !!task.wait
-  const ids = {
-    name: {},
-    mark: 1
-  }
-  task.link.forEach(base => {
-    const id = ids.name[base.name] = `x${ids.mark++}`
-    params.push(AST.createIdentifier(id))
-  })
-
-  const body = []
-
-  task.zone.forEach(zone => {
-    switch (zone.form) {
-      case `host`:
-        body.push(makeHost(file, zone))
-        break
-      case `save`:
-        body.push(makeSave(file, zone))
-        break
-      case `turn`:
-        body.push(makeTurn(file, zone))
-        break
-      case `call`:
-        body.push(makeCall(file, zone, ids))
-        break
-    }
-  })
-
-  const fxnAST = AST.createFunctionDeclaration(
-    AST.createIdentifier(task.name),
-    params,
-    AST.createBlockStatement(body),
-    { async: wait }
-  )
-  return fxnAST
 }
 
 function makeTestFile(bind) {
@@ -638,5 +669,55 @@ function createLiteral(value) {
     type: 'Literal',
     value,
     raw: value
+  }
+}
+
+function createBaseFork(file, base) {
+  const fork = createNewFork()
+  setForkBond({ fork, term: 'file', bond: file })
+  setForkBond({ fork, term: 'base', bond: base })
+  return fork
+}
+
+function createNewFork(base) {
+  const head = {
+    'fork-base': base,
+    'fork-term': {},
+    'fork-term-mark': 1
+  }
+  if (base) {
+    head['fork-term-mark'] = base['fork-term-mark']
+    base['fork-head'] = head
+  }
+  return head
+}
+
+function getForkTerm({ fork, name }) {
+  let base = fork
+
+  while (base) {
+    let term = base['fork-term'][name]
+    if (term) {
+      return term
+    }
+    base = base['fork-base']
+  }
+
+  let term = fork['fork-term'][name] = `x${fork['fork-term-mark']++}`
+  return term
+}
+
+function setForkBond({ fork, term, bond }) {
+  fork[term] = bond
+}
+
+function getForkBond(fork, term) {
+  let base = fork
+  while (base) {
+    if (base.hasOwnProperty(term)) {
+      return base[term]
+    } else {
+      base = base['fork-base']
+    }
   }
 }

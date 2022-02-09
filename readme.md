@@ -80,6 +80,11 @@ form my-form
   form my-other-form
 
   base my-attribute
+
+form x
+  case a
+  case b
+  case c
 ```
 
 ```js
@@ -93,7 +98,7 @@ base.file('test-deck/form-example', file => {
 
 ### Data/Instances
 
-```
+```js
 
 ```
 
