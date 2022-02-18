@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "dependencies": {
     "@lancejpollard/load-link-deck.js": "*",
-    "@lancejpollard/normalize-ast.js": "*"
+    "@lancejpollard/normalize-ast.js": "*",
+    "to-case": "^2.0.0"
   },
   "scripts": {
     "test": "node --enable-source-maps test"
