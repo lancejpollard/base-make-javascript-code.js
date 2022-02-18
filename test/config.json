@@ -1,13 +1,23 @@
 [
   {
     "host": "drumwork",
-    "site": "base",
-    "basePath": "../../../../../drumwork/deck/base",
+    "site": "load",
+    "basePath": "../../../../../drumwork/deck/load",
     "leadPath": "./work/dock/browser/test",
     "list": [
-      { "filePath": "work/dock/browser", "fileType": "task" },
+      { "filePath": "work/dock/browser", "fileType": "dock" },
       { "filePath": "work/dock/browser/test", "fileType": "test" },
-      { "filePath": "work/dock/browser/task/mesh", "fileType": "task" }
+      { "filePath": "work/dock/node/file", "fileType": "base" },
+      { "filePath": "work/dock/browser/task/mesh", "fileType": "base" },
+      { "filePath": "task/mine", "fileType": "base" }
+    ]
+  },
+  {
+    "host": "drumwork",
+    "site": "form",
+    "basePath": "../../../../../drumwork/deck/form",
+    "list": [
+      { "filePath": "code/size", "fileType": "base" }
     ]
   },
   {
@@ -15,15 +25,20 @@
     "site": "dock",
     "basePath": "../../../../../drumwork/deck/dock",
     "list": [
-      { "filePath": "code/javascript/function", "fileType": "dock-task" },
-      { "filePath": "code/javascript/error", "fileType": "dock-task" },
-      { "filePath": "code/javascript/module", "fileType": "dock-task" },
-      { "filePath": "code/javascript/string", "fileType": "dock-task" },
-      { "filePath": "code/javascript/base", "fileType": "dock-task" },
-      { "filePath": "code/javascript/console", "fileType": "dock-task" },
-      { "filePath": "code/javascript/number", "fileType": "dock-task" },
-      { "filePath": "code/javascript/object", "fileType": "dock-task" },
-      { "filePath": "code/javascript/promise", "fileType": "dock-task" }
+      { "filePath": "code/node/fs", "fileType": "dock" },
+      { "filePath": "code/javascript/function", "fileType": "dock" },
+      { "filePath": "code/javascript/error", "fileType": "dock" },
+      { "filePath": "code/javascript/array", "fileType": "dock" },
+      { "filePath": "code/javascript/datetime", "fileType": "dock" },
+      { "filePath": "code/javascript/interval", "fileType": "dock" },
+      { "filePath": "code/javascript/dataview", "fileType": "dock" },
+      { "filePath": "code/javascript/module", "fileType": "dock" },
+      { "filePath": "code/javascript/string", "fileType": "dock" },
+      { "filePath": "code/javascript/base", "fileType": "dock" },
+      { "filePath": "code/javascript/console", "fileType": "dock" },
+      { "filePath": "code/javascript/number", "fileType": "dock" },
+      { "filePath": "code/javascript/object", "fileType": "dock" },
+      { "filePath": "code/javascript/promise", "fileType": "dock" }
     ]
   }
 ]

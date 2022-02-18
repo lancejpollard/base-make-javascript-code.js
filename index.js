@@ -49,11 +49,11 @@ function transpile(deck) {
 
 function makeFile(fork) {
   switch (fork.file.mint) {
-    case `task`:
-      makeTaskFile(fork)
+    case `base`:
+      makeBaseFile(fork)
       break
-    case `dock-task`:
-      makeDockTaskFile(fork)
+    case `dock`:
+      makeDockFile(fork)
       break
     case `form`:
       makeFormFile(fork)
@@ -83,7 +83,7 @@ function makeFile(fork) {
   return fork
 }
 
-function makeTaskFile(fork) {
+function makeBaseFile(fork) {
   fork.output = {}
 
   fork.output.task = []
@@ -94,18 +94,86 @@ function makeTaskFile(fork) {
     fork.output.task.push(makeTask(taskFork))
   })
 
-  // fork.output.call = []
+  fork.output.load = []
+  fork.file.load.forEach(load => {
+    fork.output.load.push(makeLoad(fork, load))
+  })
+
+  fork.output.task = []
+  fork.file.task.forEach(task => {
+    const taskFork = createNewFork(fork)
+    setForkBond({ fork: taskFork, term: 'task', bond: task })
+    fork.output.task.push(makeTask(taskFork))
+  })
+
+  fork.output.form = []
+  fork.file.form.forEach(form => {
+    const formFork = createNewFork(fork)
+    setForkBond({ fork: formFork, term: 'form', bond: form })
+    fork.output.form.push(makeForm(formFork))
+  })
+
+  fork.output.call = []
+  fork.file.call.forEach(call => {
+    if (call.form === 'save') {
+      fork.output.call.push(makeSave(fork, call))
+    } else {
+      fork.output.call.push(makeCall(fork, call))
+    }
+  })
+
+  fork.output.stem = []
+  Object.keys(fork.file.stem).forEach(name => {
+    const stem = fork.file.stem[name]
+    fork.output.stem.push(makeStem(fork, stem))
+  })
 
   // fork.hostFile.call.forEach(call => {
   //   fork.output.call.push(call)
   // })
+
+  fork.bound = makeBaseBindExpression(
+    fork.file.road,
+    AST.createFunctionDeclaration(null, [
+      AST.createIdentifier('file')
+    ], AST.createBlockStatement([
+      makeKnit('~stem'),
+      makeKnit('~form'),
+      makeKnit('~form/~name'),
+      ...fork.output.load,
+      ...fork.output.form,
+      ...fork.output.stem,
+      ...fork.output.task.map((task, i) => makeFileTask(fork.file.task[i].name, task)),
+      ...fork.output.call,
+    ]))
+  )
+}
+
+function makeKnit(line) {
+  return AST.createCallExpression(
+    AST.createMemberExpression(
+      AST.createIdentifier('file'),
+      AST.createIdentifier('knit'),
+    ),
+    [AST.createLiteral(line)]
+  )
+}
+
+function makeStem(fork, stem) {
+  return AST.createCallExpression(
+    AST.createMemberExpression(
+      AST.createIdentifier('file'),
+      AST.createIdentifier('save'),
+    ),
+    [AST.createLiteral(`~stem/~${stem.name}`), AST.createLiteral(stem.bond)]
+  )
 }
 
 function makeBaseBindExpression(road, bind) {
   return AST.createCallExpression(
     AST.createMemberExpression(
       AST.createIdentifier('base'),
-      AST.createIdentifier('bind'),
+      AST.createIdentifier('file'),
     ),
     [AST.createLiteral(road), bind]
   )
@@ -185,17 +253,17 @@ function makeCall(fork, call) {
           body.push(makeTurn(hookFork, zone))
           break
         case `call`:
-          body.push(makeCall(hookFork, zone))
+          body.push(AST.createReturnStatement(makeCall(hookFork, zone)))
           break
       }
     })
 
-    const fxnAST = AST.createFunctionDeclaration(null, params, body)
+    const fxnAST = AST.createFunctionDeclaration(null, params, AST.createBlockStatement(body))
     args.push(fxnAST)
   })
 
   return AST.createCallExpression(
-    AST.createIdentifier(call.name),
+    makeTerm(fork, call.name),
     args,
     { await: wait }
   )
@@ -244,13 +312,13 @@ function makeTask(fork) {
         body.push(makeTurn(fork, zone))
         break
       case `call`:
-        body.push(makeCall(fork, zone))
+        body.push(AST.createReturnStatement(makeCall(fork, zone)))
         break
     }
   })
 
   const fxnAST = AST.createFunctionDeclaration(
-    AST.createIdentifier(task.name),
+    makeTerm(fork, task.name),
     params,
     AST.createBlockStatement(body),
     { async: wait }
@@ -258,13 +326,26 @@ function makeTask(fork) {
   return fxnAST
 }
 
-function makeDockTaskFile(fork) {
+function makeDockFile(fork) {
   fork.output = {}
+
+  fork.output.load = []
+  fork.file.load.forEach(load => {
+    fork.output.load.push(makeLoad(fork, load))
+  })
+
   fork.output.task = []
   fork.file.task.forEach(task => {
     const taskFork = createNewFork(fork)
     setForkBond({ fork: taskFork, term: 'task', bond: task })
     fork.output.task.push(makeDockTask(taskFork))
+  })
+
+  fork.output.form = []
+  fork.file.form.forEach(form => {
+    const formFork = createNewFork(fork)
+    setForkBond({ fork: formFork, term: 'form', bond: form })
+    fork.output.form.push(makeForm(formFork))
   })
 
   fork.output.call = []
@@ -281,9 +362,41 @@ function makeDockTaskFile(fork) {
     AST.createFunctionDeclaration(null, [
       AST.createIdentifier('file')
     ], AST.createBlockStatement([
-      ...fork.output.call,
+      ...fork.output.load,
+      ...fork.output.form,
       ...fork.output.task.map((task, i) => makeFileTask(fork.file.task[i].name, task)),
+      ...fork.output.call,
     ]))
+  )
+}
+
+function makeLoad(fork, load) {
+  const fileTerm = getForkTerm({ fork, name: load.road })
+
+  return AST.createVariableDeclaration('const', [
+    AST.createVariableDeclarator(
+      AST.createIdentifier(fileTerm),
+      AST.createCallExpression(
+        AST.createMemberExpression(
+          AST.createIdentifier('base'),
+          AST.createIdentifier('file'),
+          false
+        ),
+        [AST.createLiteral(load.road)]
+      )
+    )
+  ])
+}
+
+function makeForm(fork) {
+  // create JSON object in JS AST.
+  const form = getForkBond(fork, 'form')
+  return AST.createCallExpression(
+    AST.createMemberExpression(
+      AST.createIdentifier('file'),
+      AST.createIdentifier('save'),
+    ),
+    [AST.createLiteral(`~form/~name/~${form.name}`), AST.createLiteral(form)]
   )
 }
 
