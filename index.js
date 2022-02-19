@@ -74,6 +74,9 @@ function makeFile(fork) {
     case `test`:
       makeTestFile(fork)
       break
+    case `lace`:
+      makeLaceFile(fork)
+      break
     // case `view`:
     //   makeViewFile(fork)
     //   break
@@ -156,6 +159,16 @@ function makeKnit(line) {
       AST.createIdentifier('knit'),
     ),
     [AST.createLiteral(line)]
+  )
+}
+
+function makeLace(fork, lace) {
+  return AST.createCallExpression(
+    AST.createMemberExpression(
+      AST.createIdentifier('file'),
+      AST.createIdentifier('save'),
+    ),
+    [AST.createLiteral(`~lace/~${lace.name}`), AST.createLiteral(lace)]
   )
 }
 
@@ -762,6 +775,38 @@ function makeDockCallTest(fork, call) {
       )
     ])
   )
+}
+
+function makeLaceFile(fork) {
+  fork.output = {}
+
+  fork.output.lace = []
+  Object.keys(fork.file.lace).forEach(name => {
+    const lace = fork.file.lace[name]
+    fork.output.lace.push(makeLace(fork, lace))
+  })
+
+  // fork.hostFile.call.forEach(call => {
+  //   fork.output.call.push(call)
+  // })
+
+  fork.bound = makeBaseBindExpression(
+    fork.file.road,
+    AST.createFunctionDeclaration(null, [
+      AST.createIdentifier('file')
+    ], AST.createBlockStatement([
+      makeKnit('~lace'),
+      makeKnit('~form/~name'),
+      ...fork.output.lace,
+    ]))
+  )
+  return
+  importPaths.forEach(load => {
+    makeLoad(bind, load)
+  })
+  bind.file.test.forEach(test => {
+    makeTest(bind, test)
+  })
 }
 
 function makeTestFile(bind) {

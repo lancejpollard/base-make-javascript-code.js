@@ -17,7 +17,17 @@
     "site": "form",
     "basePath": "../../../../../drumwork/deck/form",
     "list": [
-      { "filePath": "code/size", "fileType": "base" }
+      { "filePath": "code/size", "fileType": "base" },
+      { "filePath": "code/form", "fileType": "base" },
+      { "filePath": "code/list", "fileType": "base" }
+    ]
+  },
+  {
+    "host": "drumwork",
+    "site": "code",
+    "basePath": "../../../../../drumwork/deck/code",
+    "list": [
+      { "filePath": "lace/html", "fileType": "lace" }
     ]
   },
   {
