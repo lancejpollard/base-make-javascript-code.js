@@ -3,23 +3,33 @@
     "host": "drumwork",
     "site": "load",
     "basePath": "../../../../../drumwork/deck/load",
-    "leadPath": "./work/dock/browser/test",
+    "leadPath": "./code/dock/browser/test",
     "list": [
-      { "filePath": "work/dock/browser", "fileType": "dock" },
-      { "filePath": "work/dock/browser/test", "fileType": "test" },
-      { "filePath": "work/dock/node/file", "fileType": "base" },
-      { "filePath": "work/dock/browser/task/mesh", "fileType": "base" },
-      { "filePath": "task/mine", "fileType": "base" }
-    ]
-  },
-  {
-    "host": "drumwork",
-    "site": "form",
-    "basePath": "../../../../../drumwork/deck/form",
-    "list": [
-      { "filePath": "code/size", "fileType": "base" },
-      { "filePath": "code/form", "fileType": "base" },
-      { "filePath": "code/list", "fileType": "base" }
+      { "filePath": "code/dock/browser", "fileType": "dock" },
+      { "filePath": "code/dock/browser/test", "fileType": "test" },
+      { "filePath": "code/dock/node/file", "fileType": "base" },
+      { "filePath": "code/dock/browser/task/mesh", "fileType": "base" },
+      { "filePath": "task/mine", "fileType": "base" },
+      { "filePath": "code/form/size", "fileType": "base" },
+      { "filePath": "code/form/form", "fileType": "base" },
+      { "filePath": "code/form/bond", "fileType": "base" },
+      { "filePath": "code/form/call", "fileType": "base" },
+      { "filePath": "code/form/task", "fileType": "base" },
+      { "filePath": "code/form/nest", "fileType": "base" },
+      { "filePath": "code/form/code", "fileType": "base" },
+      { "filePath": "code/form/bind", "fileType": "base" },
+      { "filePath": "code/form/term", "fileType": "base" },
+      { "filePath": "code/form/list", "fileType": "base" },
+      { "filePath": "code/form/date", "fileType": "base" },
+      { "filePath": "code/form/text", "fileType": "base" },
+      { "filePath": "code/form/deck", "fileType": "base" },
+      { "filePath": "code/form/feed", "fileType": "base" },
+      { "filePath": "code/form/file", "fileType": "base" },
+      { "filePath": "code/form/fold", "fileType": "base" },
+      { "filePath": "code/form/link", "fileType": "base" },
+      { "filePath": "code/form/task", "fileType": "base" },
+
+      { "filePath": "code/task/lace", "fileType": "base" }
     ]
   },
   {
@@ -29,6 +39,12 @@
     "list": [
       { "filePath": "lace/html", "fileType": "lace" }
     ]
+  },
+  {
+    "host": "drumwork",
+    "site": "work",
+    "basePath": "../../../../../drumwork/deck/work",
+    "list": []
   },
   {
     "host": "drumwork",

@@ -194,7 +194,7 @@ function makeBaseBindExpression(road, bind) {
 
 function makeBond(fork, bond) {
   switch (bond.form) {
-    case `text`: return AST.createLiteral(bond.text)
+    case `text`: return AST.createLiteral(makeCord(bond.text))
     case `size`: return AST.createLiteral(bond.size)
     case `link`: return makeLink(fork, bond.link)
     case `call`: return makeCall(fork, bond)
@@ -207,6 +207,11 @@ function makeBond(fork, bond) {
     case `loan-nest`:
       return makeNest(fork, bond.nest.nest)
     default:
+      if (Array.isArray(bond)) {
+        // TODO: create literal object manually.
+        // return bond.
+      }
+      return AST.createLiteral(bond)
       throw new Error(JSON.stringify(bond))
   }
 }
@@ -508,10 +513,20 @@ function makeThrowError(fork, call) {
     AST.createNewExpression(
       AST.createIdentifier('Error'),
       [
-        factor.bond.text ? AST.createLiteral(factor.bond.text) : makeBond(fork, factor.bond)
+        factor.bond.form === 'text'
+          ? makeText(fork, factor.bond.text)
+          : makeBond(fork, factor.bond)
       ]
     )
   )
+}
+
+function makeCord(list) {
+  return list.map(stem => stem.text).join('')
+}
+
+function makeText(fork, text) {
+  console.log(text)
 }
 
 function makeDockCall(fork, call) {
@@ -524,7 +539,7 @@ function makeDockCall(fork, call) {
 
 function makeDockCallCreateLiteral(fork, call) {
   const literal = call.bind.filter(bind => bind.name === 'literal')[0]
-  return AST.createReturnStatement(createLiteral(literal.bond.text))
+  return AST.createReturnStatement(createLiteral(makeCord(literal.bond.text)))
 }
 
 function makeDockCallDelete(fork, call) {
@@ -546,7 +561,7 @@ function makeDockCallGetAspect(fork, call) {
   return AST.createReturnStatement(
     AST.createMemberExpression(
       makeBond(fork, object.bond),
-      AST.createIdentifier(aspect.bond.text),
+      AST.createIdentifier(makeCord(aspect.bond.text)),
       false
     )
   )
@@ -559,7 +574,7 @@ function makeDockCallSetAspect(fork, call) {
   return AST.createAssignmentExpression(
     AST.createMemberExpression(
       makeLink(fork, object.sift.link),
-      AST.createIdentifier(aspect.sift.text),
+      AST.createIdentifier(makeCord(aspect.sift.text)),
       false
     ),
     makeLink(fork, factor.sift.link)
@@ -599,7 +614,7 @@ function makeDockCallKeyword2(fork, call) {
   return AST.createReturnStatement(
     AST.createBinaryExpression(
       makeBond(fork, left.bond),
-      keyword.bond.text,
+      makeCord(keyword.bond.text),
       makeBond(fork, right.bond)
     )
   )
@@ -611,7 +626,7 @@ function makeDockCallKeyword(fork, call) {
   return AST.createReturnStatement(
     AST.createUnaryExpression(
       makeBond(fork, value.bond),
-      keyword.bond.text,
+      makeCord(keyword.bond.text),
       true
     )
   )
@@ -679,7 +694,7 @@ function makeDockCallUnaryOperation(fork, call) {
   return AST.createReturnStatement(
     AST.createUpdateExpression(
       makeBond(fork, value.bond),
-      operation.bond.text,
+      makeCord(operation.bond.text),
       true
     )
   )
@@ -692,9 +707,9 @@ function makeDockCallBinaryExpression(fork, call) {
   return AST.createReturnStatement(
     AST.createBinaryExpression(
       makeBond(fork, left.bond),
-      operation.bond.text,
+      makeCord(operation.bond.text),
       right.bond.text
-        ? AST.createLiteral(right.bond.text)
+        ? AST.createLiteral(makeCord(right.bond.text))
         : makeBond(fork, right.bond)
     )
   )
@@ -709,7 +724,7 @@ function makeDockCallMake(fork, call) {
   })
   return AST.createReturnStatement(
     AST.createNewExpression(
-      AST.createIdentifier(ctor.bond.text),
+      AST.createIdentifier(makeCord(ctor.bond.text)),
       args
     )
   )
@@ -729,7 +744,7 @@ function makeDockCallCallBase(fork, call) {
       AST.createCallExpression(
         AST.createMemberExpression(
           makeTerm(fork, object.bond.name),
-          AST.createIdentifier(method.bond.text)
+          AST.createIdentifier(makeCord(method.bond.text))
         ),
         args
       )
@@ -739,8 +754,8 @@ function makeDockCallCallBase(fork, call) {
   return AST.createReturnStatement(
     AST.createCallExpression(
       AST.createMemberExpression(
-        AST.createIdentifier(object.bond.text),
-        AST.createIdentifier(method.bond.text)
+        AST.createIdentifier(makeCord(object.bond.text)),
+        AST.createIdentifier(makeCord(method.bond.text))
       ),
       args
     )
@@ -756,7 +771,7 @@ function makeDockCallCallFunction(fork, call) {
   })
   return AST.createReturnStatement(
     AST.createCallExpression(
-      AST.createIdentifier(func.bond.text),
+      AST.createIdentifier(makeCord(func.bond.text)),
       args
     )
   )
