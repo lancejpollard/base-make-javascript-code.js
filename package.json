@@ -4,6 +4,7 @@
   "dependencies": {
     "@lancejpollard/load-link-deck.js": "*",
     "@lancejpollard/normalize-ast.js": "*",
+    "lodash": "^4.17.21",
     "to-case": "^2.0.0"
   },
   "scripts": {
